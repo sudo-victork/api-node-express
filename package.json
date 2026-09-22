@@ -1,0 +1,15 @@
+{
+  "name": "pdv_adega",
+  "version": "1.0.0",
+  "description": "primeira versao desenvolvimento sistema para adega",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.2.1"
+  }
+}

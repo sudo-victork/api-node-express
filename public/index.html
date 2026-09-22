@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>PDV Adega</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a1d;
+      color: #eee;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1 {
+      color: #c9a24b;
+      border-bottom: 2px solid #c9a24b;
+      padding-bottom: 8px;
+    }
+    h2 {
+      color: #c9a24b;
+      font-size: 1.1rem;
+      margin-top: 32px;
+    }
+    .card {
+      background: #26262b;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    .produto {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #3a3a3f;
+    }
+    .produto:last-child { border-bottom: none; }
+    .produto-nome { font-weight: 600; }
+    .produto-detalhe { font-size: 0.85rem; color: #999; }
+    button {
+      background: #c9a24b;
+      color: #1a1a1d;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #ddb862; }
+    button.secundario {
+      background: transparent;
+      border: 1px solid #c9a24b;
+      color: #c9a24b;
+    }
+    button.perigo {
+      background: #7a2e2e;
+      color: #fff;
+    }
+    #comandaInfo {
+      font-size: 1.1rem;
+      color: #c9a24b;
+      font-weight: 600;
+    }
+    #itensComanda li {
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #3a3a3f;
+    }
+    #totalComanda {
+      font-size: 1.3rem;
+      font-weight: 700;
+      text-align: right;
+      margin-top: 12px;
+    }
+    select, input {
+      background: #1a1a1d;
+      color: #eee;
+      border: 1px solid #3a3a3f;
+      border-radius: 6px;
+      padding: 8px;
+    }
+    .acoes-comanda { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    #cupomPreview {
+      white-space: pre;
+      background: #111;
+      color: #0f0;
+      padding: 16px;
+      border-radius: 6px;
+      font-family: monospace;
+      margin-top: 16px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>🍷 PDV Adega</h1>
+
+  <div class="card">
+    <h2>Produtos</h2>
+    <ul id="produtos" style="list-style:none; padding:0;"></ul>
+  </div>
+
+  <div class="card">
+    <h2>Comanda</h2>
+    <button id="abrirComanda">Abrir nova comanda</button>
+    <p id="comandaInfo"></p>
+    <ul id="itensComanda" style="padding:0;"></ul>
+    <p id="totalComanda"></p>
+
+    <div class="acoes-comanda" id="acoesComanda" style="display:none;">
+      <select id="formaPagamento">
+        <option value="dinheiro">Dinheiro</option>
+        <option value="cartao">Cartão</option>
+        <option value="pix">Pix</option>
+      </select>
+      <button id="fecharComanda">Fechar comanda</button>
+      <button class="secundario" id="verCupom">Ver cupom</button>
+      <button class="perigo" id="cancelarComanda">Cancelar comanda</button>
+    </div>
+
+    <pre id="cupomPreview"></pre>
+  </div>
+
+  <script>
+    let comandaAtual = null;
+
+    async function carregarProdutos() {
+      const res = await fetch('/produtos');
+      const produtos = await res.json();
+      const lista = document.getElementById('produtos');
+      lista.innerHTML = '';
+      produtos.forEach(p => {
+        const li = document.createElement('li');
+        li.className = 'produto';
+        li.innerHTML = `
+          <div>
+            <div class="produto-nome">${p.nome}</div>
+            <div class="produto-detalhe">R$ ${p.preco.toFixed(2)} · estoque: ${p.estoque_atual}</div>
+          </div>
+        `;
+        const btn = document.createElement('button');
+        btn.textContent = '+ Adicionar';
+        btn.onclick = () => adicionarItem(p.id);
+        li.appendChild(btn);
+        lista.appendChild(li);
+      });
+    }
+
+    document.getElementById('abrirComanda').onclick = async () => {
+      const res = await fetch('/comandas', { method: 'POST' });
+      comandaAtual = await res.json();
+      document.getElementById('comandaInfo').textContent = `Comanda #${comandaAtual.id} — aberta`;
+      document.getElementById('acoesComanda').style.display = 'flex';
+      document.getElementById('cupomPreview').style.display = 'none';
+      carregarItensComanda();
+    };
+
+    async function adicionarItem(produto_id) {
+      if (!comandaAtual) {
+        alert('Abra uma comanda primeiro');
+        return;
+      }
+      await fetch(`/comandas/${comandaAtual.id}/itens`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ produto_id, quantidade: 1 })
+      });
+      carregarItensComanda();
+    }
+
+    async function carregarItensComanda() {
+      const res = await fetch(`/comandas/${comandaAtual.id}/itens`);
+      const dados = await res.json();
+      const lista = document.getElementById('itensComanda');
+      lista.innerHTML = '';
+      dados.itens.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = `${item.quantidade}x ${item.nome} — R$ ${(item.quantidade * item.preco_unitario).toFixed(2)}`;
+        lista.appendChild(li);
+      });
+      document.getElementById('totalComanda').textContent = `Total: R$ ${dados.total.toFixed(2)}`;
+    }
+
+    document.getElementById('fecharComanda').onclick = async () => {
+      const forma_pagamento = document.getElementById('formaPagamento').value;
+      const res = await fetch(`/comandas/${comandaAtual.id}/fechar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forma_pagamento })
+      });
+      const dados = await res.json();
+      if (!res.ok) {
+        alert(dados.erro);
+        return;
+      }
+      document.getElementById('comandaInfo').textContent = `Comanda #${comandaAtual.id} — fechada (${forma_pagamento})`;
+      carregarProdutos(); // atualiza estoque na tela
+    };
+
+    document.getElementById('cancelarComanda').onclick = async () => {
+      const res = await fetch(`/comandas/${comandaAtual.id}/cancelar`, { method: 'POST' });
+      const dados = await res.json();
+      if (!res.ok) {
+        alert(dados.erro);
+        return;
+      }
+      document.getElementById('comandaInfo').textContent = `Comanda #${comandaAtual.id} — cancelada`;
+      document.getElementById('acoesComanda').style.display = 'none';
+    };
+
+    document.getElementById('verCupom').onclick = async () => {
+      const res = await fetch(`/comandas/${comandaAtual.id}/cupom`);
+      const texto = await res.text();
+      const pre = document.getElementById('cupomPreview');
+      pre.textContent = texto;
+      pre.style.display = 'block';
+    };
+
+    carregarProdutos();
+  </script>
+</body>
+</html>
